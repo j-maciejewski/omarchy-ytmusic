@@ -114,12 +114,20 @@ class YtMusicService(MusicRepository):
 
         def _do_search() -> List[Track]:
             try:
+                # Official songs first, then regular YouTube videos (covers, live, uploads)
+                # which are not part of the YouTube Music "songs" catalog.
                 results = self._ytmusic.search(query=query, filter="songs", limit=20)
+                try:
+                    results += self._ytmusic.search(query=query, filter="videos", limit=20)
+                except Exception as ex:
+                    logger.warning("Video search error for '%s': %s", query, ex)
                 tracks: List[Track] = []
+                seen = set()
                 for item in results:
                     video_id = item.get("videoId")
-                    if not video_id:
+                    if not video_id or video_id in seen:
                         continue
+                    seen.add(video_id)
                     artists = ", ".join(a.get("name", "") for a in item.get("artists", [])) or "Unknown Artist"
                     album = item.get("album", {}).get("name", "") if item.get("album") else ""
                     duration_sec = int(item.get("duration_seconds", 0) or 0)
@@ -138,6 +146,42 @@ class YtMusicService(MusicRepository):
                 return tracks
             except Exception as ex:
                 logger.error("Search error for '%s': %s", query, ex)
+                return []
+
+        loop = asyncio.get_running_loop()
+        return await loop.run_in_executor(None, _do_search)
+
+    async def search_albums(self, query: str) -> List[Playlist]:
+        """Search albums; each result's playlist_id is the MPREb_ browseId used by get_playlist_tracks."""
+        if not query.strip():
+            return []
+
+        def _do_search() -> List[Playlist]:
+            try:
+                results = self._ytmusic.search(query=query, filter="albums", limit=20)
+                albums: List[Playlist] = []
+                for item in results:
+                    browse_id = item.get("browseId")
+                    if not browse_id:
+                        continue
+                    artists = ", ".join(a.get("name", "") for a in item.get("artists", [])) or "Unknown Artist"
+                    # e.g. "Album • 1997" / "EP • 2021"
+                    details = " • ".join(str(p) for p in (item.get("type"), item.get("year")) if p)
+                    thumbnails = item.get("thumbnails") or []
+                    thumb_url = thumbnails[-1].get("url", "") if thumbnails else ""
+                    albums.append(
+                        Playlist(
+                            playlist_id=browse_id,
+                            title=item.get("title", "Unknown Album"),
+                            description=details,
+                            track_count=0,
+                            thumbnail_url=thumb_url,
+                            author=artists,
+                        )
+                    )
+                return albums
+            except Exception as ex:
+                logger.error("Album search error for '%s': %s", query, ex)
                 return []
 
         loop = asyncio.get_running_loop()
@@ -358,17 +402,21 @@ class YtMusicService(MusicRepository):
                 if playlist_id.startswith("MPREb_"):
                     # It's an album!
                     playlist_data = self._ytmusic.get_album(browseId=playlist_id)
+                    self._prefer_album_audio_tracks(playlist_data)
                 else:
                     playlist_data = self._ytmusic.get_playlist(playlistId=playlist_id, limit=100)
                 
+                # Album tracks have no thumbnails of their own and a plain-string "album" field
+                album_thumbnails = playlist_data.get("thumbnails") or []
                 for item in playlist_data.get("tracks", []):
                     video_id = item.get("videoId")
                     if not video_id:
                         continue
                     artists = ", ".join(a.get("name", "") for a in item.get("artists", [])) or "Unknown Artist"
-                    album = item.get("album", {}).get("name", "") if item.get("album") else ""
+                    album_field = item.get("album")
+                    album = album_field.get("name", "") if isinstance(album_field, dict) else (album_field or "")
                     duration_sec = int(item.get("duration_seconds", 0) or 0)
-                    thumbnails = item.get("thumbnails") or item.get("thumbnail") or []
+                    thumbnails = item.get("thumbnails") or item.get("thumbnail") or album_thumbnails
                     thumb_url = thumbnails[-1].get("url", "") if thumbnails else ""
                     tracks.append(
                         Track(
@@ -387,6 +435,28 @@ class YtMusicService(MusicRepository):
 
         loop = asyncio.get_running_loop()
         return await loop.run_in_executor(None, _fetch_tracks)
+
+    def _prefer_album_audio_tracks(self, album_data: dict) -> None:
+        """Swap album track videoIds for their audio-only versions, in place.
+
+        Album tracks that have an official music video point at the video (with intros,
+        skits, etc). The album's audioPlaylistId lists the audio-only tracks in the same order.
+        """
+        audio_playlist_id = album_data.get("audioPlaylistId")
+        tracks = album_data.get("tracks", [])
+        if not audio_playlist_id or not tracks:
+            return
+        try:
+            audio_tracks = self._ytmusic.get_playlist(playlistId=audio_playlist_id, limit=None).get("tracks", [])
+        except Exception as ex:
+            logger.warning("Could not fetch audio playlist %s: %s", audio_playlist_id, ex)
+            return
+        # Only trust the positional mapping when both lists line up
+        if len(audio_tracks) != len(tracks):
+            return
+        for track, audio in zip(tracks, audio_tracks):
+            if audio.get("videoId") and audio.get("title") == track.get("title"):
+                track["videoId"] = audio["videoId"]
 
     async def get_watch_playlist(self, video_id: str, limit: int = 25) -> List[Track]:
         """Retrieve dynamic radio watch playlist based on a track."""

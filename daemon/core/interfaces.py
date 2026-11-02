@@ -14,6 +14,11 @@ class MusicRepository(ABC):
         pass
 
     @abstractmethod
+    async def search_albums(self, query: str) -> List[Playlist]:
+        """Search YouTube Music albums (returned as playlists keyed by album browseId)."""
+        pass
+
+    @abstractmethod
     async def get_playlists(self) -> List[Playlist]:
         """Retrieve user playlists and library playlists."""
         pass

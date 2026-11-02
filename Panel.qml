@@ -93,10 +93,10 @@ Panel {
     statusProc.running = true
   }
 
-  function doSearch(q) {
+  function doSearch(q, mode) {
     if (!q || !String(q).trim()) return
     root.isSearching = true
-    searchProc.command = [cliBin, "search", String(q).trim()]
+    searchProc.command = [cliBin, mode === "albums" ? "search_albums" : "search", String(q).trim()]
     searchProc.running = true
   }
 
@@ -500,11 +500,17 @@ Panel {
           searchResults:  root.searchResults
           isSearching:    root.isSearching
           foreground:     root.foreground
-          onSearchRequested: function(q) { root.doSearch(q) }
+          onSearchRequested: function(q, mode) { root.doSearch(q, mode) }
           onClearRequested: { root.searchResults = []; root.isSearching = false }
           onPlayTrackRequested: function(t) {
             root.doExecute(["play_track", JSON.stringify(t)]); root.activeTab = 0
           }
+          onOpenAlbumRequested: function(album) {
+            // Open album track list in Playlists tab
+            root.doFetchPlaylistTracks(album)
+            root.activeTab = 2
+          }
+          onPlayAlbumRequested: function(albumId) { root.doExecute(["play_playlist", albumId, "0"]); root.activeTab = 0 }
           onOpenQueueOptionsRequested: function(t) {
             root.trackToAddToQueue = t
             root.showQueueOptionDialog = true

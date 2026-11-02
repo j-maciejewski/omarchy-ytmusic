@@ -438,7 +438,7 @@ def setup_auth():
 
 def main():
     if len(sys.argv) < 2:
-        print("Usage: omarchy-ytmusic {start|stop|restart|status|play [query]|toggle|next|prev|volume [0-100]|search [query]|playlists|play_playlist [id]|auth}")
+        print("Usage: omarchy-ytmusic {start|stop|restart|status|play [query]|toggle|next|prev|volume [0-100]|search [query]|search_albums [query]|playlists|play_playlist [id]|auth}")
         return
 
     action = sys.argv[1].lower()
@@ -490,6 +490,10 @@ def main():
     elif action == "search":
         query = " ".join(sys.argv[2:]).strip()
         res = send_ipc("search", {"query": query})
+        print(json.dumps(res, indent=2))
+    elif action == "search_albums":
+        query = " ".join(sys.argv[2:]).strip()
+        res = send_ipc("search_albums", {"query": query})
         print(json.dumps(res, indent=2))
     elif action == "home":
         res = send_ipc("get_home")

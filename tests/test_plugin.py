@@ -183,9 +183,16 @@ class TestIpcServer(unittest.IsolatedAsyncioTestCase):
         await self.ipc.stop()
 
     def test_registered_handlers(self):
-        expected = ["ping", "get_state", "search", "get_playlists", "play_track", "add_to_queue", "seek", "next", "prev"]
+        expected = ["ping", "get_state", "search", "search_albums", "get_playlists", "play_track", "add_to_queue", "seek", "next", "prev"]
         for handler in expected:
             self.assertIn(handler, self.ipc._handlers)
+
+    async def test_search_albums_handler_serializes_playlists(self):
+        album = Playlist(playlist_id="MPREb_abc", title="OK Computer", description="Album • 1997", author="Radiohead")
+        self.mock_repo.search_albums = AsyncMock(return_value=[album])
+        res = await self.ipc._handlers["search_albums"]({"query": "ok computer"})
+        self.mock_repo.search_albums.assert_awaited_once_with("ok computer")
+        self.assertEqual(res, [album.to_dict()])
 
     async def test_socket_lifecycle_and_permissions(self):
         await self.ipc.start()
@@ -222,6 +229,61 @@ class TestIpcServer(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(response["status"], "error")
         self.assertEqual(response["error"], "Invalid request")
         self.assertIsNone(response["id"])
+
+
+class TestYtMusicAlbumSearch(unittest.IsolatedAsyncioTestCase):
+    async def test_search_albums_maps_results_to_playlists(self):
+        from services.ytmusic_service import YtMusicService
+        service = YtMusicService.__new__(YtMusicService)
+        service._ytmusic = MagicMock()
+        service._ytmusic.search.return_value = [
+            {
+                "title": "OK Computer", "type": "Album", "year": "1997", "browseId": "MPREb_abc",
+                "artists": [{"name": "Radiohead"}],
+                "thumbnails": [{"url": "small"}, {"url": "large"}],
+            },
+            {"title": "No browse id", "type": "Single"},
+        ]
+
+        albums = await service.search_albums("ok computer")
+
+        service._ytmusic.search.assert_called_once_with(query="ok computer", filter="albums", limit=20)
+        self.assertEqual(albums, [Playlist(
+            playlist_id="MPREb_abc", title="OK Computer", description="Album • 1997",
+            thumbnail_url="large", author="Radiohead",
+        )])
+
+
+    def test_album_tracks_use_audio_only_versions(self):
+        from services.ytmusic_service import YtMusicService
+        service = YtMusicService.__new__(YtMusicService)
+        service._ytmusic = MagicMock()
+        service._ytmusic.get_playlist.return_value = {"tracks": [
+            {"videoId": "audio1", "title": "One More Time"},
+            {"videoId": "audio2", "title": "Aerodynamic"},
+        ]}
+        album = {"audioPlaylistId": "OLAK5uy_x", "tracks": [
+            {"videoId": "video1", "title": "One More Time"},
+            {"videoId": "video2", "title": "Aerodynamic"},
+        ]}
+
+        service._prefer_album_audio_tracks(album)
+
+        self.assertEqual([t["videoId"] for t in album["tracks"]], ["audio1", "audio2"])
+
+    def test_album_tracks_unchanged_when_audio_playlist_does_not_line_up(self):
+        from services.ytmusic_service import YtMusicService
+        service = YtMusicService.__new__(YtMusicService)
+        service._ytmusic = MagicMock()
+        service._ytmusic.get_playlist.return_value = {"tracks": [{"videoId": "audio1", "title": "One More Time"}]}
+        album = {"audioPlaylistId": "OLAK5uy_x", "tracks": [
+            {"videoId": "video1", "title": "One More Time"},
+            {"videoId": "video2", "title": "Aerodynamic"},
+        ]}
+
+        service._prefer_album_audio_tracks(album)
+
+        self.assertEqual([t["videoId"] for t in album["tracks"]], ["video1", "video2"])
 
 
 class TestPrivateFilePersistence(unittest.TestCase):

@@ -9,14 +9,27 @@ Item {
 
   property var searchResults: []
   property bool isSearching: false
+  property string searchMode: "songs"  // "songs" | "albums"
   property color foreground: Color.foreground
   property color dim: Qt.darker(foreground, 1.55)
 
-  signal searchRequested(string query)
+  signal searchRequested(string query, string mode)
   signal clearRequested()
   signal playTrackRequested(var track)
   signal openQueueOptionsRequested(var track)
   signal addToPlaylistRequested(var track)
+  signal openAlbumRequested(var album)
+  signal playAlbumRequested(string albumId)
+
+  function setMode(mode) {
+    if (root.searchMode === mode) return
+    root.searchMode = mode
+    root.clearRequested()
+    if (searchInput.text.trim() !== "") {
+      searchDebounceTimer.stop()
+      root.searchRequested(searchInput.text.trim(), mode)
+    }
+  }
 
   implicitWidth: Style.space(340)
   implicitHeight: Style.space(380)
@@ -77,7 +90,7 @@ Item {
           onAccepted: {
             searchDebounceTimer.stop();
             if (text.trim() !== "") {
-              root.searchRequested(text.trim());
+              root.searchRequested(text.trim(), root.searchMode);
             }
           }
         }
@@ -88,7 +101,7 @@ Item {
           repeat: false
           onTriggered: {
             if (searchInput.text.trim().length >= 3) {
-              root.searchRequested(searchInput.text.trim());
+              root.searchRequested(searchInput.text.trim(), root.searchMode);
             }
           }
         }
@@ -107,10 +120,44 @@ Item {
       }
     }
 
+    // Search Mode Toggle (Songs / Albums)
+    Row {
+      spacing: Style.space(6)
+
+      Repeater {
+        model: [{ mode: "songs", label: "Songs" }, { mode: "albums", label: "Albums" }]
+
+        delegate: Rectangle {
+          readonly property bool selected: root.searchMode === modelData.mode
+          width: modeLabel.implicitWidth + Style.space(20)
+          height: Style.space(24)
+          radius: height / 2
+          color: selected ? Color.accent : (modeMouse.containsMouse ? Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.12) : Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.06))
+
+          Text {
+            id: modeLabel
+            anchors.centerIn: parent
+            text: modelData.label
+            color: parent.selected ? Color.background : root.foreground
+            font.bold: parent.selected
+            font.pixelSize: Style.font.caption
+          }
+
+          MouseArea {
+            id: modeMouse
+            anchors.fill: parent
+            hoverEnabled: true
+            cursorShape: Qt.PointingHandCursor
+            onClicked: root.setMode(modelData.mode)
+          }
+        }
+      }
+    }
+
     // Results & Status Container
     Item {
       width: parent.width
-      height: parent.height - Style.space(46)
+      height: parent.height - Style.space(80)
 
       // Searching State
       Text {
@@ -136,7 +183,7 @@ Item {
 
         Text {
           anchors.horizontalCenter: parent.horizontalCenter
-          text: "Type to search songs & artists"
+          text: root.searchMode === "albums" ? "Type to search albums" : "Type to search songs & artists"
           color: root.dim
           font.pixelSize: Style.font.caption
         }
@@ -162,6 +209,8 @@ Item {
 
             delegate: Rectangle {
               id: trackDelegate
+              // Album results carry a playlist_id (MPREb_ browseId); tracks carry a video_id
+              readonly property bool isAlbum: !!modelData.playlist_id
               width: resultsColumn.width
               height: Style.space(46)
               radius: Style.cornerRadius
@@ -172,7 +221,7 @@ Item {
                 anchors.fill: parent
                 hoverEnabled: true
                 cursorShape: Qt.PointingHandCursor
-                onClicked: root.playTrackRequested(modelData)
+                onClicked: trackDelegate.isAlbum ? root.openAlbumRequested(modelData) : root.playTrackRequested(modelData)
               }
 
               Row {
@@ -200,7 +249,8 @@ Item {
 
                 // Info
                 Column {
-                  width: parent.width - Style.space(130)
+                  // Albums only show the play button: thumbnail + play + 2 spacings
+                  width: parent.width - Style.space(trackDelegate.isAlbum ? 76 : 130)
                   anchors.verticalCenter: parent.verticalCenter
                   spacing: 1
 
@@ -215,7 +265,9 @@ Item {
 
                   Text {
                     width: parent.width
-                    text: (modelData.artist || "") + (modelData.duration_seconds ? (" • " + Utils.formatSeconds(modelData.duration_seconds)) : "")
+                    text: trackDelegate.isAlbum
+                      ? (modelData.author || "") + (modelData.description ? (" • " + modelData.description) : "")
+                      : (modelData.artist || "") + (modelData.duration_seconds ? (" • " + Utils.formatSeconds(modelData.duration_seconds)) : "")
                     color: root.dim
                     font.pixelSize: Style.space(10)
                     elide: Text.ElideRight
@@ -227,13 +279,14 @@ Item {
                   text: "\uf04b"
                   buttonSize: Style.space(26)
                   anchors.verticalCenter: parent.verticalCenter
-                  toolTipText: "Play Now"
+                  toolTipText: trackDelegate.isAlbum ? "Play Album" : "Play Now"
                   foreground: root.foreground
-                  onClicked: root.playTrackRequested(modelData)
+                  onClicked: trackDelegate.isAlbum ? root.playAlbumRequested(modelData.playlist_id) : root.playTrackRequested(modelData)
                 }
 
                 // Add to Queue (Options: Next / End)
                 IconButton {
+                  visible: !trackDelegate.isAlbum
                   text: "\uf03a"
                   buttonSize: Style.space(24)
                   anchors.verticalCenter: parent.verticalCenter
@@ -244,6 +297,7 @@ Item {
 
                 // Add to Playlist
                 IconButton {
+                  visible: !trackDelegate.isAlbum
                   text: "\uf067"
                   buttonSize: Style.space(24)
                   anchors.verticalCenter: parent.verticalCenter

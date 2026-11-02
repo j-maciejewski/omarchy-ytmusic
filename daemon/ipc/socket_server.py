@@ -33,6 +33,7 @@ class IpcServer:
             "get_state": self._handle_get_state,
             "get_home": self._handle_get_home,
             "search": self._handle_search,
+            "search_albums": self._handle_search_albums,
             "get_playlists": self._handle_get_playlists,
             "get_playlist_tracks": self._handle_get_playlist_tracks,
             "play_track": self._handle_play_track,
@@ -163,6 +164,11 @@ class IpcServer:
         query = args.get("query", "")
         tracks = await self.repo.search(query)
         return [t.to_dict() for t in tracks]
+
+    async def _handle_search_albums(self, args: dict) -> list:
+        query = args.get("query", "")
+        albums = await self.repo.search_albums(query)
+        return [a.to_dict() for a in albums]
 
     async def _handle_get_playlists(self, args: dict) -> list:
         playlists = await self.repo.get_playlists()
