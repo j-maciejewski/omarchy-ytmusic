@@ -24,40 +24,50 @@ Item {
   }
 
   ScrollView {
+    id: scroll
     anchors.fill: parent
     contentWidth: availableWidth
     clip: true
     visible: !root.isLoadingHome || (root.homeData && root.homeData.length > 0)
 
     Column {
+      id: sections
       width: parent.width
-      spacing: Style.space(24)
-      padding: Style.space(16)
+      spacing: Style.space(14)
+      topPadding: Style.space(12)
+      bottomPadding: Style.space(12)
+      // The panel already has side margins; only keep the last card clear of the overlaid scrollbar
+      rightPadding: scroll.ScrollBar.vertical.width + Style.space(4)
 
       Repeater {
         model: root.homeData
 
         Column {
-          width: parent.width
-          spacing: Style.space(12)
+          width: sections.width - sections.leftPadding - sections.rightPadding
+          spacing: Style.space(8)
 
           Text {
             text: modelData.title || "Section"
             color: root.foreground
             font.bold: true
-            font.pixelSize: Style.space(18)
+            font.pixelSize: Style.space(15)
           }
 
           ListView {
+            id: shelf
+            // Split the row evenly so whole cards fit with none cut off
+            readonly property int cardsPerRow: 4
+            readonly property real cardWidth: Math.floor((width - spacing * (cardsPerRow - 1)) / cardsPerRow)
+
             width: parent.width
-            height: Style.space(220)
+            height: cardWidth + Style.space(48)
             orientation: ListView.Horizontal
-            spacing: Style.space(16)
+            spacing: Style.space(10)
             clip: false
             model: modelData.contents
 
             delegate: Item {
-              width: Style.space(130)
+              width: shelf.cardWidth
               height: parent.height
 
               Rectangle {
@@ -67,7 +77,7 @@ Item {
 
                 Column {
                   anchors.fill: parent
-                  spacing: Style.space(8)
+                  spacing: Style.space(5)
 
                   // Thumbnail
                   Rectangle {
@@ -93,10 +103,10 @@ Item {
                     text: modelData.title || ""
                     color: root.foreground
                     font.bold: true
-                    font.pixelSize: Style.space(13)
+                    font.pixelSize: Style.space(11)
                     elide: Text.ElideRight
                     maximumLineCount: 2
-                    wrapMode: Text.Wrap
+                    wrapMode: Text.WordWrap
                   }
 
                   // Subtitle
@@ -104,7 +114,7 @@ Item {
                     width: parent.width
                     text: modelData.description || modelData.subtitle || ""
                     color: root.dim
-                    font.pixelSize: Style.space(11)
+                    font.pixelSize: Style.space(10)
                     elide: Text.ElideRight
                     maximumLineCount: 1
                   }
