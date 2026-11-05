@@ -201,7 +201,7 @@ class YtMusicService(MusicRepository):
         # 3. Inject "Selección Rápida" shelf
         if liked_tracks:
             import random
-            top_liked = liked_tracks[:40]
+            top_liked = [t for t in liked_tracks if t.is_song][:40]
             random.shuffle(top_liked)
             quick_picks = top_liked[:15]
             
@@ -384,6 +384,8 @@ class YtMusicService(MusicRepository):
                                 album="",
                                 duration_seconds=0,
                                 thumbnail_url=thumb_url,
+                                # Only YouTube Music songs are uploaded by "<Artist> - Topic" channels
+                                is_song=(artist_raw or "").endswith(" - Topic"),
                             ))
 
                         page_token = data.get("nextPageToken")
@@ -421,6 +423,7 @@ class YtMusicService(MusicRepository):
                             album=album,
                             duration_seconds=duration_sec,
                             thumbnail_url=thumb_url,
+                            is_song=item.get("videoType", "MUSIC_VIDEO_TYPE_ATV") == "MUSIC_VIDEO_TYPE_ATV",
                         )
                     )
                 return tracks
@@ -462,6 +465,9 @@ class YtMusicService(MusicRepository):
                 for item in radio_data.get("tracks", []):
                     vid = item.get("videoId")
                     if not vid or vid == video_id:
+                        continue
+                    # Skip music videos and user uploads; keep only songs
+                    if item.get("videoType", "MUSIC_VIDEO_TYPE_ATV") != "MUSIC_VIDEO_TYPE_ATV":
                         continue
                     artists = ", ".join(a.get("name", "") for a in item.get("artists", [])) or "Unknown Artist"
                     album = item.get("album", {}).get("name", "") if item.get("album") else ""

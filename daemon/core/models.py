@@ -12,6 +12,7 @@ class Track:
     album: str = ""
     duration_seconds: int = 0
     thumbnail_url: str = ""
+    is_song: bool = True  # False for music videos and user uploads
 
     def to_dict(self) -> dict:
         return asdict(self)
@@ -25,6 +26,7 @@ class Track:
             album=str(data.get("album", "")),
             duration_seconds=int(data.get("duration_seconds", 0)),
             thumbnail_url=str(data.get("thumbnail_url", "")),
+            is_song=bool(data.get("is_song", True)),
         )
 
 
