@@ -114,13 +114,8 @@ class YtMusicService(MusicRepository):
 
         def _do_search() -> List[Track]:
             try:
-                # Official songs first, then regular YouTube videos (covers, live, uploads)
-                # which are not part of the YouTube Music "songs" catalog.
+                # Only official songs; regular YouTube videos are excluded.
                 results = self._ytmusic.search(query=query, filter="songs", limit=20)
-                try:
-                    results += self._ytmusic.search(query=query, filter="videos", limit=20)
-                except Exception as ex:
-                    logger.warning("Video search error for '%s': %s", query, ex)
                 tracks: List[Track] = []
                 seen = set()
                 for item in results:
