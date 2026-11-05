@@ -318,12 +318,12 @@ Panel {
     owner: root
     bar: root.bar
     open: root.opened
-    contentWidth: flyout.fittedContentWidth(Style.space(350))
-    contentHeight: Style.space(435)
+    contentWidth: flyout.fittedContentWidth(Style.space(420))
+    contentHeight: Style.space(520)
+    padding: Style.space(20)
 
     Column {
       anchors.fill: parent
-      anchors.margins: Style.space(12)
       spacing: Style.space(10)
 
       // Header with flex spacing

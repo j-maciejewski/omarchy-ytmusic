@@ -48,8 +48,8 @@ Item {
       // Album Art Container (Expanded, perfectly centered)
       Rectangle {
         id: artContainer
-        width: Style.space(145)
-        height: Style.space(145)
+        width: Style.space(200)
+        height: Style.space(200)
         radius: Style.cornerRadius
         color: Qt.rgba(0, 0, 0, 0.25)
         anchors.horizontalCenter: parent.horizontalCenter
