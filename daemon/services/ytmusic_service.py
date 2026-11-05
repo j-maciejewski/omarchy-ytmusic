@@ -190,7 +190,7 @@ class YtMusicService(MusicRepository):
         # 2. Fetch generic/anonymous home feed in executor
         def _fetch_home() -> List[dict]:
             try:
-                return self._ytmusic.get_home(limit=4)
+                return self._ytmusic.get_home(limit=8)
             except Exception as ex:
                 logger.error("Error fetching home suggestions: %s", ex)
                 return []
