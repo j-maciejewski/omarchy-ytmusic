@@ -153,7 +153,7 @@ class TestMpvPlayerLifecycle(unittest.IsolatedAsyncioTestCase):
         process = MagicMock()
         process.poll.return_value = None
         process.wait.return_value = 0
-        player = MpvPlayerService(socket_path="/nonexistent/mpv-test.sock")
+        player = MpvPlayerService(socket_path="/nonexistent/mpv-test.sock", settings_path="/nonexistent/settings.json")
 
         with patch("services.mpv_player_service.subprocess.Popen", return_value=process), \
              patch("services.mpv_player_service.os.path.exists", return_value=False), \
@@ -164,6 +164,38 @@ class TestMpvPlayerLifecycle(unittest.IsolatedAsyncioTestCase):
         process.terminate.assert_called_once_with()
         process.wait.assert_called_once_with(timeout=2)
         self.assertIsNone(player._process)
+
+
+class TestMpvVolumePersistence(unittest.IsolatedAsyncioTestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.settings = os.path.join(self.tmp.name, "settings.json")
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def test_volume_defaults_to_50_without_saved_settings(self):
+        player = MpvPlayerService(socket_path="/nonexistent/mpv-test.sock", settings_path=self.settings)
+        self.assertEqual(player.get_state().volume, 50)
+
+    def test_volume_restored_from_saved_settings(self):
+        atomic_write_private_json(self.settings, {"volume": 30})
+        player = MpvPlayerService(socket_path="/nonexistent/mpv-test.sock", settings_path=self.settings)
+        self.assertEqual(player.get_state().volume, 30)
+
+    def test_corrupt_settings_fall_back_to_default(self):
+        with open(self.settings, "w") as f:
+            f.write("not json")
+        player = MpvPlayerService(socket_path="/nonexistent/mpv-test.sock", settings_path=self.settings)
+        self.assertEqual(player.get_state().volume, 50)
+
+    async def test_set_volume_persists_for_next_start(self):
+        player = MpvPlayerService(socket_path="/nonexistent/mpv-test.sock", settings_path=self.settings)
+        player._send_command = AsyncMock()
+        await player.set_volume(120)
+
+        restarted = MpvPlayerService(socket_path="/nonexistent/mpv-test.sock", settings_path=self.settings)
+        self.assertEqual(restarted.get_state().volume, 100)
 
 
 class TestIpcServer(unittest.IsolatedAsyncioTestCase):

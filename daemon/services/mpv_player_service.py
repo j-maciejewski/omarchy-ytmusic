@@ -8,24 +8,42 @@ import subprocess
 from typing import Optional, Callable
 from core.models import Track, PlaybackState
 from core.interfaces import AudioPlayer
-from core.paths import MPV_SOCKET_PATH, COOKIE_FILE
+from core.paths import MPV_SOCKET_PATH, COOKIE_FILE, SETTINGS_FILE
+from core.files import atomic_write_private_json
 
 logger = logging.getLogger("mpv_player")
+
+DEFAULT_VOLUME = 50
 
 
 class MpvPlayerService(AudioPlayer):
     """Audio player implementation using headless MPV with JSON IPC over Unix socket."""
 
-    def __init__(self, socket_path: str = MPV_SOCKET_PATH):
+    def __init__(self, socket_path: str = MPV_SOCKET_PATH, settings_path: str = SETTINGS_FILE):
         self.socket_path = socket_path
+        self.settings_path = settings_path
         self._process: Optional[subprocess.Popen] = None
         self._reader: Optional[asyncio.StreamReader] = None
         self._writer: Optional[asyncio.StreamWriter] = None
-        self._state = PlaybackState()
+        self._state = PlaybackState(volume=self._load_volume())
         self._on_eof_callback: Optional[Callable[[], None]] = None
         self._request_id = 0
         self._running = False
         self._listen_task: Optional[asyncio.Task] = None
+
+    def _load_volume(self) -> int:
+        """Restore the last volume the user set; fall back to the default when missing or unreadable."""
+        try:
+            with open(self.settings_path, encoding="utf-8") as settings_file:
+                return max(0, min(100, int(json.load(settings_file)["volume"])))
+        except (OSError, ValueError, KeyError, TypeError):
+            return DEFAULT_VOLUME
+
+    def _save_volume(self, volume: int) -> None:
+        try:
+            atomic_write_private_json(self.settings_path, {"volume": volume})
+        except OSError as ex:
+            logger.warning("Could not persist volume: %s", ex)
 
     def get_state(self) -> PlaybackState:
         return self._state
@@ -52,7 +70,7 @@ class MpvPlayerService(AudioPlayer):
             "--demuxer-max-bytes=50MiB",
             "--demuxer-readahead-secs=20",
             "--cache-pause-initial=no",
-            "--volume=50",
+            f"--volume={self._state.volume}",
             "--ao=pipewire,pulse,alsa",
             "--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36",
             "--referrer=https://www.youtube.com/",
@@ -229,4 +247,5 @@ class MpvPlayerService(AudioPlayer):
     async def set_volume(self, volume: int) -> None:
         vol = max(0, min(100, volume))
         self._state.volume = vol
+        self._save_volume(vol)
         await self._send_command(["set_property", "volume", vol])
