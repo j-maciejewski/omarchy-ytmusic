@@ -34,6 +34,11 @@ class MusicRepository(ABC):
         pass
 
     @abstractmethod
+    async def get_track_album(self, video_id: str) -> Optional[Playlist]:
+        """Resolve the album a song belongs to (as a playlist keyed by album browseId)."""
+        pass
+
+    @abstractmethod
     async def get_home(self) -> List[dict]:
         """Retrieve home feed suggestions and shelves."""
         pass

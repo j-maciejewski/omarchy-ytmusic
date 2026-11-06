@@ -36,6 +36,7 @@ class IpcServer:
             "search_albums": self._handle_search_albums,
             "get_playlists": self._handle_get_playlists,
             "get_playlist_tracks": self._handle_get_playlist_tracks,
+            "get_track_album": self._handle_get_track_album,
             "play_track": self._handle_play_track,
             "play_playlist": self._handle_play_playlist,
             "add_to_queue": self._handle_add_to_queue,
@@ -178,6 +179,11 @@ class IpcServer:
         playlist_id = args.get("playlist_id", "")
         tracks = await self.repo.get_playlist_tracks(playlist_id)
         return [t.to_dict() for t in tracks]
+
+    async def _handle_get_track_album(self, args: dict) -> Optional[dict]:
+        video_id = args.get("video_id", "")
+        album = await self.repo.get_track_album(video_id)
+        return album.to_dict() if album else None
 
     async def _handle_play_track(self, args: dict) -> bool:
         track_data = args.get("track", {})

@@ -35,6 +35,7 @@ Item {
   signal toggleLike()
   signal addToPlaylist()
   signal showQueue()
+  signal goToAlbum()
 
   Column {
     anchors.fill: parent
@@ -292,6 +293,14 @@ Item {
           toolTipText: "Playback Queue"
           foreground: root.foreground
           onClicked: root.showQueue()
+        }
+
+        IconButton {
+          text: "\uf192"
+          buttonSize: Style.space(28)
+          toolTipText: "Go to Album"
+          foreground: root.foreground
+          onClicked: root.goToAlbum()
         }
       }
 
