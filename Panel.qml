@@ -48,6 +48,7 @@ Panel {
 
   // ── UI state ──────────────────────────────────────────────────────────────
   property int  activeTab: 0
+  property bool albumOpenedFromPlayer: false  // Back from the album returns to Now Playing
   property bool showQueueView: false
   property var  trackToAddToPlaylist: null
   property bool showAddToPlaylistDialog: false
@@ -127,6 +128,10 @@ Panel {
     if (!root.trackVideoId || trackAlbumProc.running) return
     trackAlbumProc.command = [cliBin, "track_album", root.trackVideoId]
     trackAlbumProc.running = true
+  }
+
+  onActiveTabChanged: {
+    if (activeTab !== 2) albumOpenedFromPlayer = false
   }
 
   function doFetchQueue() {
@@ -277,6 +282,7 @@ Panel {
         if (res && res.status === "ok" && res.data && res.data.playlist_id) {
           root.doFetchPlaylistTracks(res.data)
           root.activeTab = 2
+          root.albumOpenedFromPlayer = true
         }
       }
     }
@@ -554,7 +560,10 @@ Panel {
           foreground:      root.foreground
           onRefreshRequested:      root.doFetchPlaylists()
           onOpenPlaylistRequested: function(pl) { root.doFetchPlaylistTracks(pl) }
-          onBackRequested:         { root.openedPlaylist = null; root.playlistTracks = [] }
+          onBackRequested: {
+            root.openedPlaylist = null; root.playlistTracks = []
+            if (root.albumOpenedFromPlayer) root.activeTab = 0
+          }
           onPlayPlaylistRequested: function(plId) { root.doExecute(["play_playlist", plId, "0"]); root.activeTab = 0 }
           onPlayTrackRequested: function(t, idx) {
             if (root.openedPlaylist && root.openedPlaylist.playlist_id) {
