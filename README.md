@@ -16,6 +16,10 @@ A native, ultra-lightweight **YouTube Music** player and bar widget built specif
 - **Smart Error Handling:** Automatically skips region-blocked or deleted tracks in playlists without aborting playback.
 - **Playlist & Mix Browser:** Explore user library playlists, view track lists inside albums/mixes, and selectively queue or save songs.
 - **Interactive Liked Songs:** Real-time synchronized like/unlike tracking (`Liked Music`).
+- **Lyrics:** Open the current song's lyrics from the Now Playing view (microphone button). When YouTube Music has timestamps, the current line is highlighted and auto-scrolled, and clicking a line seeks to it; otherwise plain lyrics are shown.
+- **Go to Album:** Jump from the Now Playing view to the album of the current song; going back returns you to the player.
+- **Remembered Volume:** Starts at 50% on first launch and restores the last volume you set on every restart, including after reboots.
+- **Audio-only Streaming:** Streams audio-only Opus via `yt-dlp`, falling back to the Android client when needed.
 - **Infinite Radio / Autoplay:** Automatically populates similar tracks seamlessly in the background when playing individual tracks.
 - **Permanent Google OAuth 2.0:** Secure, non-expiring login with background access token refresh via Google Cloud Console.
 - **Quick Bar Controls:**
@@ -67,7 +71,7 @@ To remove the plugin from Omarchy:
 omarchy plugin remove sebasgl23.ytmusic
 ```
 
-To also clean up the isolated dependency cache and temporary files:
+To also clean up the isolated dependency cache, saved settings (such as volume) and temporary files:
 ```bash
 rm -rf ~/.local/state/omarchy-ytmusic
 ```
@@ -131,6 +135,10 @@ The player daemon can be controlled headlessly from scripts, keybindings, or ter
 ~/.config/omarchy/plugins/sebasgl23.ytmusic/bin/omarchy-ytmusic playlists
 ~/.config/omarchy/plugins/sebasgl23.ytmusic/bin/omarchy-ytmusic playlist_tracks "LM"
 ~/.config/omarchy/plugins/sebasgl23.ytmusic/bin/omarchy-ytmusic like "<video_id>"
+
+# Current Song Details
+~/.config/omarchy/plugins/sebasgl23.ytmusic/bin/omarchy-ytmusic lyrics "<video_id>"
+~/.config/omarchy/plugins/sebasgl23.ytmusic/bin/omarchy-ytmusic track_album "<video_id>"
 ```
 
 ---
@@ -150,13 +158,17 @@ sebasgl23.ytmusic/
 │   ├── SearchView.qml         # Live search view & results list
 │   ├── PlaylistsView.qml      # Playlist browser & track inspector
 │   ├── QueueView.qml          # Current playback queue
+│   ├── LyricsView.qml         # Synced / plain lyrics of the current song
+│   ├── QueueOptionDialog.qml  # Play next / add to queue dialog
 │   └── AddToPlaylistDialog.qml# Playlist selection dialog
 ├── daemon/
 │   ├── main.py                # Async daemon entry point
 │   ├── cli.py                 # CLI dispatcher & OAuth assistant
 │   ├── core/
 │   │   ├── models.py          # Domain entities (Track, Playlist, PlaybackState)
-│   │   └── interfaces.py      # Abstract repository & player ports
+│   │   ├── interfaces.py      # Abstract repository & player ports
+│   │   ├── paths.py           # Runtime (sockets, logs) & persistent state paths
+│   │   └── files.py           # Atomic private JSON writes (settings)
 │   ├── services/
 │   │   ├── ytmusic_service.py # Hybrid YouTube Data API v3 + ytmusicapi service
 │   │   ├── mpv_player_service.py # Headless MPV audio engine over Unix socket IPC
