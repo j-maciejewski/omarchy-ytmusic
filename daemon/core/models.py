@@ -60,7 +60,7 @@ class PlaybackState:
     current_track: Optional[Track] = None
     position_seconds: float = 0.0
     duration_seconds: float = 0.0
-    volume: int = 100
+    volume: int = 50
     is_muted: bool = False
     is_liked: bool = False
     repeat_mode: str = "off"  # "off", "one", "all"
