@@ -194,6 +194,18 @@ class TestIpcServer(unittest.IsolatedAsyncioTestCase):
         self.mock_repo.search_albums.assert_awaited_once_with("ok computer")
         self.assertEqual(res, [album.to_dict()])
 
+    async def test_get_track_album_handler(self):
+        album = Playlist(playlist_id="MPREb_abc", title="OK Computer", author="Radiohead")
+        self.mock_repo.get_track_album = AsyncMock(return_value=album)
+        res = await self.ipc._handlers["get_track_album"]({"video_id": "vid1"})
+        self.mock_repo.get_track_album.assert_awaited_once_with("vid1")
+        self.assertEqual(res, album.to_dict())
+
+    async def test_get_track_album_handler_without_album(self):
+        self.mock_repo.get_track_album = AsyncMock(return_value=None)
+        res = await self.ipc._handlers["get_track_album"]({"video_id": "vid1"})
+        self.assertIsNone(res)
+
     async def test_socket_lifecycle_and_permissions(self):
         await self.ipc.start()
         self.assertTrue(os.path.exists(self.test_socket))
@@ -253,6 +265,31 @@ class TestYtMusicAlbumSearch(unittest.IsolatedAsyncioTestCase):
             thumbnail_url="large", author="Radiohead",
         )])
 
+
+    async def test_get_track_album_reads_album_from_watch_playlist(self):
+        from services.ytmusic_service import YtMusicService
+        service = YtMusicService.__new__(YtMusicService)
+        service._ytmusic = MagicMock()
+        service._ytmusic.get_watch_playlist.return_value = {"tracks": [{
+            "videoId": "vid1", "title": "Airbag",
+            "artists": [{"name": "Radiohead"}],
+            "album": {"name": "OK Computer", "id": "MPREb_abc"},
+            "thumbnail": [{"url": "small"}, {"url": "large"}],
+        }]}
+
+        album = await service.get_track_album("vid1")
+
+        self.assertEqual(album, Playlist(
+            playlist_id="MPREb_abc", title="OK Computer", thumbnail_url="large", author="Radiohead",
+        ))
+
+    async def test_get_track_album_returns_none_for_music_videos(self):
+        from services.ytmusic_service import YtMusicService
+        service = YtMusicService.__new__(YtMusicService)
+        service._ytmusic = MagicMock()
+        service._ytmusic.get_watch_playlist.return_value = {"tracks": [{"videoId": "vid1", "album": None}]}
+
+        self.assertIsNone(await service.get_track_album("vid1"))
 
     def test_album_tracks_use_audio_only_versions(self):
         from services.ytmusic_service import YtMusicService

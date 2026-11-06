@@ -492,6 +492,36 @@ class YtMusicService(MusicRepository):
         loop = asyncio.get_running_loop()
         return await loop.run_in_executor(None, _fetch_radio)
 
+    async def get_track_album(self, video_id: str) -> Optional[Playlist]:
+        """Look up the album of a song; its watch-playlist entry carries the album browseId."""
+        if not video_id:
+            return None
+
+        def _fetch_album() -> Optional[Playlist]:
+            try:
+                watch_data = self._ytmusic.get_watch_playlist(videoId=video_id, limit=1)
+                for item in watch_data.get("tracks", []):
+                    if item.get("videoId") != video_id:
+                        continue
+                    album = item.get("album") or {}
+                    if not album.get("id"):
+                        return None
+                    artists = ", ".join(a.get("name", "") for a in item.get("artists", []))
+                    thumbnails = item.get("thumbnail") or item.get("thumbnails") or []
+                    return Playlist(
+                        playlist_id=album["id"],
+                        title=album.get("name") or "Unknown Album",
+                        thumbnail_url=thumbnails[-1].get("url", "") if thumbnails else "",
+                        author=artists,
+                    )
+                return None
+            except Exception as ex:
+                logger.error("Error resolving album for %s: %s", video_id, ex)
+                return None
+
+        loop = asyncio.get_running_loop()
+        return await loop.run_in_executor(None, _fetch_album)
+
     async def get_stream_url(self, video_id: str) -> Optional[str]:
         """Extract fresh streamable audio URL using optimized persistent yt-dlp instance."""
         # 1. Check TTL cache (valid for 3 hours)

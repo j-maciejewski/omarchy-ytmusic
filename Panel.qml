@@ -123,6 +123,12 @@ Panel {
     playlistTracksProc.running = true
   }
 
+  function doGoToAlbum() {
+    if (!root.trackVideoId || trackAlbumProc.running) return
+    trackAlbumProc.command = [cliBin, "track_album", root.trackVideoId]
+    trackAlbumProc.running = true
+  }
+
   function doFetchQueue() {
     if (queueProc.running) return
     queueProc.command = [cliBin, "queue"]
@@ -258,6 +264,22 @@ Panel {
       }
     }
     onExited: function(code) { root.isLoadingTracks = false }
+  }
+
+  Process {
+    id: trackAlbumProc
+    running: false
+    stdout: StdioCollector {
+      id: trackAlbumOut
+      waitForEnd: true
+      onStreamFinished: {
+        var res = root.parseObj(trackAlbumOut.text)
+        if (res && res.status === "ok" && res.data && res.data.playlist_id) {
+          root.doFetchPlaylistTracks(res.data)
+          root.activeTab = 2
+        }
+      }
+    }
   }
 
   Process {
@@ -430,6 +452,7 @@ Panel {
           onChangeVolume: function(v) { root.doExecute(["volume", String(v)]) }
           onToggleShuffle: root.doExecute(["shuffle"])
           onShowQueue:    { root.showQueueView = true; root.doFetchQueue() }
+          onGoToAlbum:    root.doGoToAlbum()
           onToggleLike: {
             if (root.trackVideoId) {
               root.isLiked = !root.isLiked

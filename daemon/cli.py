@@ -535,6 +535,10 @@ def main():
         pl_id = sys.argv[2] if len(sys.argv) > 2 else ""
         res = send_ipc("get_playlist_tracks", {"playlist_id": pl_id})
         print(json.dumps(res, indent=2))
+    elif action == "track_album":
+        vid = sys.argv[2] if len(sys.argv) > 2 else ""
+        res = send_ipc("get_track_album", {"video_id": vid})
+        print(json.dumps(res, indent=2))
     elif action == "like":
         vid = sys.argv[2] if len(sys.argv) > 2 else ""
         res = send_ipc("rate_track", {"video_id": vid, "rating": "LIKE"})
