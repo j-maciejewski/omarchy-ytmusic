@@ -3,5 +3,5 @@ charset-normalizer==3.5.0
 idna==3.18
 requests==2.34.2
 urllib3==2.7.0
-yt-dlp==2026.7.4
+yt-dlp==2026.10.26
 ytmusicapi==1.12.2
