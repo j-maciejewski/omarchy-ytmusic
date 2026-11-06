@@ -36,6 +36,7 @@ Item {
   signal addToPlaylist()
   signal showQueue()
   signal goToAlbum()
+  signal showLyrics()
 
   Column {
     anchors.fill: parent
@@ -301,6 +302,14 @@ Item {
           toolTipText: "Go to Album"
           foreground: root.foreground
           onClicked: root.goToAlbum()
+        }
+
+        IconButton {
+          text: "\uf130"
+          buttonSize: Style.space(28)
+          toolTipText: "Lyrics"
+          foreground: root.foreground
+          onClicked: root.showLyrics()
         }
       }
 

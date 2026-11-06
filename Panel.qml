@@ -45,11 +45,15 @@ Panel {
   property int  queueIndex:          -1
   property var  homeData:            []
   property bool isLoadingHome:       false
+  property var  lyricsData:          null
+  property string lyricsVideoId:     ""
+  property bool isLoadingLyrics:     false
 
   // ── UI state ──────────────────────────────────────────────────────────────
   property int  activeTab: 0
   property bool albumOpenedFromPlayer: false  // Back from the album returns to Now Playing
   property bool showQueueView: false
+  property bool showLyricsView: false
   property var  trackToAddToPlaylist: null
   property bool showAddToPlaylistDialog: false
   property var  trackToAddToQueue: null
@@ -130,8 +134,21 @@ Panel {
     trackAlbumProc.running = true
   }
 
+  function doFetchLyrics() {
+    if (!root.trackVideoId || lyricsProc.running || root.lyricsVideoId === root.trackVideoId) return
+    root.lyricsVideoId = root.trackVideoId
+    root.lyricsData = null
+    root.isLoadingLyrics = true
+    lyricsProc.command = [cliBin, "lyrics", root.trackVideoId]
+    lyricsProc.running = true
+  }
+
   onActiveTabChanged: {
     if (activeTab !== 2) albumOpenedFromPlayer = false
+  }
+
+  onTrackVideoIdChanged: {
+    if (root.showLyricsView) doFetchLyrics()
   }
 
   function doFetchQueue() {
@@ -289,6 +306,27 @@ Panel {
   }
 
   Process {
+    id: lyricsProc
+    running: false
+    stdout: StdioCollector {
+      id: lyricsOut
+      waitForEnd: true
+      onStreamFinished: {
+        root.isLoadingLyrics = false
+        var res = root.parseObj(lyricsOut.text)
+        if (res && res.status === "ok" && res.data && res.data.video_id === root.lyricsVideoId)
+          root.lyricsData = res.data
+      }
+    }
+    onExited: function(code) {
+      root.isLoadingLyrics = false
+      // The track changed while this fetch was in flight
+      if (root.showLyricsView && root.lyricsVideoId !== root.trackVideoId)
+        Qt.callLater(root.doFetchLyrics)
+    }
+  }
+
+  Process {
     id: queueProc
     running: false
     stdout: StdioCollector {
@@ -438,7 +476,7 @@ Panel {
 
         NowPlayingView {
           anchors.fill: parent
-          visible: root.activeTab === 0 && !root.showAddToPlaylistDialog && !root.showQueueView
+          visible: root.activeTab === 0 && !root.showAddToPlaylistDialog && !root.showQueueView && !root.showLyricsView
           trackTitle:     root.trackTitle
           trackArtist:    root.trackArtist
           trackThumbnail: root.trackThumbnail
@@ -459,6 +497,7 @@ Panel {
           onToggleShuffle: root.doExecute(["shuffle"])
           onShowQueue:    { root.showQueueView = true; root.doFetchQueue() }
           onGoToAlbum:    root.doGoToAlbum()
+          onShowLyrics:   { root.showLyricsView = true; root.doFetchLyrics() }
           onToggleLike: {
             if (root.trackVideoId) {
               root.isLiked = !root.isLiked
@@ -493,6 +532,18 @@ Panel {
             root.doFetchQueue()
           }
           onCloseRequested: { root.showQueueView = false }
+        }
+
+        LyricsView {
+          anchors.fill: parent
+          visible: root.activeTab === 0 && root.showLyricsView && !root.showAddToPlaylistDialog
+          lyrics:     root.lyricsData
+          isLoading:  root.isLoadingLyrics
+          position:   root.positionSeconds
+          trackTitle: root.trackTitle
+          foreground: root.foreground
+          onSeekRequested:  function(s) { root.doExecute(["seek", String(Math.floor(s))]) }
+          onCloseRequested: { root.showLyricsView = false }
         }
 
         HomeView {
