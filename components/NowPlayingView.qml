@@ -14,7 +14,7 @@ Item {
   property real position: 0
   property real duration: 0
   property bool isPlaying: false
-  property int volume: 100
+  property int volume: 50
   property int lastNonZeroVolume: 100
   property bool isLiked: false
   property string repeatMode: "off"

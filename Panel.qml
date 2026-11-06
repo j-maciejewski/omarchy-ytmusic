@@ -28,7 +28,7 @@ Panel {
   property string trackVideoId:    ""
   property real   positionSeconds: 0
   property real   durationSeconds: 0
-  property int    volumeLevel:     100
+  property int    volumeLevel:     50
   property bool   isLiked:         false
   property string repeatMode:      "off"
   property bool   isShuffled:      false
@@ -64,7 +64,7 @@ Panel {
     root.isPlaying       = (data.status === "playing")
     root.positionSeconds = data.position_seconds  || 0
     root.durationSeconds = data.duration_seconds  || 0
-    root.volumeLevel     = (data.volume !== undefined) ? data.volume : 100
+    root.volumeLevel     = (data.volume !== undefined) ? data.volume : 50
     root.isLiked         = !!data.is_liked
     root.repeatMode      = data.repeat_mode  || "off"
     root.isShuffled      = !!data.is_shuffled
