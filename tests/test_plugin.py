@@ -206,6 +206,13 @@ class TestIpcServer(unittest.IsolatedAsyncioTestCase):
         res = await self.ipc._handlers["get_track_album"]({"video_id": "vid1"})
         self.assertIsNone(res)
 
+    async def test_get_lyrics_handler(self):
+        lyrics = {"video_id": "vid1", "synced": False, "source": "", "lines": [{"text": "la", "start_seconds": -1}]}
+        self.mock_repo.get_lyrics = AsyncMock(return_value=lyrics)
+        res = await self.ipc._handlers["get_lyrics"]({"video_id": "vid1"})
+        self.mock_repo.get_lyrics.assert_awaited_once_with("vid1")
+        self.assertEqual(res, lyrics)
+
     async def test_socket_lifecycle_and_permissions(self):
         await self.ipc.start()
         self.assertTrue(os.path.exists(self.test_socket))
@@ -290,6 +297,62 @@ class TestYtMusicAlbumSearch(unittest.IsolatedAsyncioTestCase):
         service._ytmusic.get_watch_playlist.return_value = {"tracks": [{"videoId": "vid1", "album": None}]}
 
         self.assertIsNone(await service.get_track_album("vid1"))
+
+    async def test_get_lyrics_returns_timed_lines_in_seconds(self):
+        from services.ytmusic_service import YtMusicService
+        from ytmusicapi.models.lyrics import LyricLine
+        service = YtMusicService.__new__(YtMusicService)
+        service._ytmusic = MagicMock()
+        service._ytmusic.get_watch_playlist.return_value = {"lyrics": "MPLYt_abc"}
+        service._ytmusic.get_lyrics.return_value = {
+            "lyrics": [LyricLine(text="I was a liar", start_time=9200, end_time=10630, id=1)],
+            "source": "Source: LyricFind", "hasTimestamps": True,
+        }
+
+        lyrics = await service.get_lyrics("vid1")
+
+        service._ytmusic.get_lyrics.assert_called_once_with("MPLYt_abc", timestamps=True)
+        self.assertEqual(lyrics, {
+            "video_id": "vid1", "synced": True, "source": "Source: LyricFind",
+            "lines": [{"text": "I was a liar", "start_seconds": 9.2}],
+        })
+
+    async def test_get_lyrics_splits_plain_lyrics_into_unsynced_lines(self):
+        from services.ytmusic_service import YtMusicService
+        service = YtMusicService.__new__(YtMusicService)
+        service._ytmusic = MagicMock()
+        service._ytmusic.get_watch_playlist.return_value = {"lyrics": "MPLYt_abc"}
+        service._ytmusic.get_lyrics.return_value = {"lyrics": "one\ntwo", "source": None, "hasTimestamps": False}
+
+        lyrics = await service.get_lyrics("vid1")
+
+        self.assertFalse(lyrics["synced"])
+        self.assertEqual(lyrics["lines"], [
+            {"text": "one", "start_seconds": -1}, {"text": "two", "start_seconds": -1},
+        ])
+
+    async def test_get_lyrics_falls_back_to_plain_when_timed_parsing_fails(self):
+        from services.ytmusic_service import YtMusicService
+        service = YtMusicService.__new__(YtMusicService)
+        service._ytmusic = MagicMock()
+        service._ytmusic.get_watch_playlist.return_value = {"lyrics": "MPLYt_abc"}
+        service._ytmusic.get_lyrics.side_effect = [
+            KeyError("cueRange"), {"lyrics": "one", "source": None, "hasTimestamps": False},
+        ]
+
+        lyrics = await service.get_lyrics("vid1")
+
+        service._ytmusic.get_lyrics.assert_called_with("MPLYt_abc", timestamps=False)
+        self.assertEqual(lyrics["lines"], [{"text": "one", "start_seconds": -1}])
+
+    async def test_get_lyrics_returns_none_without_lyrics_browse_id(self):
+        from services.ytmusic_service import YtMusicService
+        service = YtMusicService.__new__(YtMusicService)
+        service._ytmusic = MagicMock()
+        service._ytmusic.get_watch_playlist.return_value = {"lyrics": None}
+
+        self.assertIsNone(await service.get_lyrics("vid1"))
+        service._ytmusic.get_lyrics.assert_not_called()
 
     def test_album_tracks_use_audio_only_versions(self):
         from services.ytmusic_service import YtMusicService

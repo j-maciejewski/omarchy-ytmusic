@@ -39,6 +39,11 @@ class MusicRepository(ABC):
         pass
 
     @abstractmethod
+    async def get_lyrics(self, video_id: str) -> Optional[dict]:
+        """Retrieve lyrics of a song, time-synced when YouTube Music provides timestamps."""
+        pass
+
+    @abstractmethod
     async def get_home(self) -> List[dict]:
         """Retrieve home feed suggestions and shelves."""
         pass

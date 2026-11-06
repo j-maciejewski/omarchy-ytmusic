@@ -522,6 +522,42 @@ class YtMusicService(MusicRepository):
         loop = asyncio.get_running_loop()
         return await loop.run_in_executor(None, _fetch_album)
 
+    async def get_lyrics(self, video_id: str) -> Optional[dict]:
+        """Fetch lyrics via the watch playlist's lyrics browseId, preferring timestamped lines."""
+        if not video_id:
+            return None
+
+        def _fetch_lyrics() -> Optional[dict]:
+            try:
+                browse_id = self._ytmusic.get_watch_playlist(videoId=video_id, limit=1).get("lyrics")
+                if not browse_id:
+                    return None
+                try:
+                    data = self._ytmusic.get_lyrics(browse_id, timestamps=True)
+                except KeyError:
+                    # ytmusicapi chokes on some timed payloads (e.g. missing cueRange); plain text still works
+                    data = self._ytmusic.get_lyrics(browse_id, timestamps=False)
+                if not data or not data.get("lyrics"):
+                    return None
+                if data.get("hasTimestamps"):
+                    lines = [{"text": line.text, "start_seconds": line.start_time / 1000}
+                             for line in data["lyrics"]]
+                else:
+                    lines = [{"text": text, "start_seconds": -1}
+                             for text in data["lyrics"].splitlines()]
+                return {
+                    "video_id": video_id,
+                    "synced": bool(data.get("hasTimestamps")),
+                    "source": data.get("source") or "",
+                    "lines": lines,
+                }
+            except Exception as ex:
+                logger.error("Error fetching lyrics for %s: %s", video_id, ex)
+                return None
+
+        loop = asyncio.get_running_loop()
+        return await loop.run_in_executor(None, _fetch_lyrics)
+
     async def get_stream_url(self, video_id: str) -> Optional[str]:
         """Extract fresh streamable audio URL using optimized persistent yt-dlp instance."""
         # 1. Check TTL cache (valid for 3 hours)
