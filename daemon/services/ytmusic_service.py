@@ -34,7 +34,8 @@ class YtMusicService(MusicRepository):
             "skip_download": True,
             "extractor_args": {
                 "youtube": {
-                    "player_client": ["android"]
+                    # Default clients return audio-only Opus; android alone only gets a muxed 360p video (format 18)
+                    "player_client": ["default", "android"]
                 }
             },
         }
