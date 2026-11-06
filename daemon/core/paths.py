@@ -25,7 +25,21 @@ def get_runtime_dir() -> Path:
     return base
 
 
+def get_state_dir() -> Path:
+    """Return the private directory for settings that must survive reboots (~/.local/state/omarchy-ytmusic)."""
+    xdg_state = os.environ.get("XDG_STATE_HOME", str(Path.home() / ".local" / "state"))
+    base = Path(xdg_state) / "omarchy-ytmusic"
+    base.mkdir(parents=True, exist_ok=True)
+    try:
+        os.chmod(base, 0o700)
+    except Exception:
+        pass
+    return base
+
+
 RUNTIME_DIR = get_runtime_dir()
+STATE_DIR = get_state_dir()
+SETTINGS_FILE = str(STATE_DIR / "settings.json")
 SOCKET_PATH = str(RUNTIME_DIR / "daemon.sock")
 MPV_SOCKET_PATH = str(RUNTIME_DIR / "mpv.sock")
 PID_FILE = str(RUNTIME_DIR / "daemon.pid")
