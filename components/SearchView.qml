@@ -31,6 +31,9 @@ Item {
     }
   }
 
+  // Focus the search input whenever the Search tab becomes visible
+  onVisibleChanged: if (visible) Qt.callLater(function() { searchInput.forceActiveFocus() })
+
   implicitWidth: Style.space(340)
   implicitHeight: Style.space(380)
 
