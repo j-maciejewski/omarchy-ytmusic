@@ -355,21 +355,9 @@ Panel {
     tooltipText: root.trackVideoId !== ""
       ? (root.trackArtist + " - " + root.trackTitle + (root.isPlaying ? " ▶" : " ⏸"))
       : "YouTube Music"
-    iconComponent: Component {
-      Item {
-        anchors.fill: parent
-
-        Image {
-          anchors.centerIn: parent
-          width: Math.round(parent.width * 0.82)
-          height: Math.round(parent.height * 0.82)
-          source: Qt.resolvedUrl("ytmusic-bar-icon.svg")
-          fillMode: Image.PreserveAspectFit
-          smooth: true
-          mipmap: true
-        }
-      }
-    }
+    // Nerd Font glyph (md play_circle_outline) so the icon matches the other
+    // bar icons in weight, size and theme color.
+    text: String.fromCodePoint(0xf040d)
     onPressed: function(btn) {
       if (btn === Qt.RightButton)       root.doExecute(["next"])
       else if (btn === Qt.MiddleButton) root.doExecute(["toggle"])
